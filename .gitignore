@@ -1,0 +1,5 @@
+testlib
+Score.txt
+*.o
+*.swp
+a.out
