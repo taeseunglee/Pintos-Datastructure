@@ -338,7 +338,6 @@ command_handle (Environment *env)
               break;
             }
 
-/*
           // Hashtable
           struct hash_named* temp_hash_named = env->all_hash;
           while (temp_hash_named->next)
@@ -353,13 +352,8 @@ command_handle (Environment *env)
                &temp_hash_named->next->inner_hash;
               struct hash_elem* temp_remove = NULL;
 
-              while (!hash_empty(temp_hash))
-                {
-                  temp_remove = hash_pop_front(temp_hash);
-                  struct hash_item* temp_remove_item = 
-                   hash_entry(temp_remove, struct hash_item, hash_sequence);
-                  free(temp_remove_item);
-                }
+              hash_destroy(temp_hash, hash_action_destructor);
+
               struct hash_named* temp_remove_named =
                temp_hash_named->next;
               temp_hash_named->next = temp_hash_named->next->next;
@@ -367,7 +361,6 @@ command_handle (Environment *env)
               free(temp_remove_named);
               break;
             }
-*/
           // Bitmap
         }
       break;
@@ -692,6 +685,18 @@ command_handle (Environment *env)
         }
       break;
     case 26: // hash_empty
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          if (hash_empty(&temp_hash_named->inner_hash))
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 27: // hash_apply
         {
