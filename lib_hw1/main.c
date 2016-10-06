@@ -215,14 +215,12 @@ command_handle (Environment *env)
           struct list_named* temp_list_named = env->all_list;
           while (temp_list_named->next)
             {
-              printf("%s\n", temp_list_named->next->name);
               if (!strcmp(temp_list_named->next->name, env->argv[1])) { break; }
               temp_list_named = temp_list_named->next;
             }
 
           if (temp_list_named->next)
             {
-              printf("%s\n", temp_list_named->next->name);
               struct list *temp_list =
                &temp_list_named->next->inner_list;
               struct list_elem* temp_remove = NULL;
@@ -245,10 +243,36 @@ command_handle (Environment *env)
       break;
       // List
     case 2: // list_insert
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_item* temp_item =
+           calloc(1, sizeof(struct list_item));
+          temp_item->item = atoi(env->argv[3]);
+
+          int i = 0,
+              n = atoi(env->argv[2]);
+          struct list inner_list = temp_list_named->inner_list;
+          struct list_elem* before;
+          for (i = 0, before = list_begin(&inner_list)
+               ; i < n && before != list_end (&inner_list)
+               ; ++i, before = list_next(before));
+          list_insert(before, &temp_item->list_sequence);
+        }
       break;
     case 3: // list_splice
       break;
     case 47: // list_push_front
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_item* temp_item = 
+           calloc(1, sizeof(struct list_item));
+          temp_item->item = atoi(env->argv[2]);
+          list_push_front(&temp_list_named->inner_list
+                         , &temp_item->list_sequence
+                        );
+        }
       break;
     case 4: // list_push_back
         {
@@ -263,6 +287,18 @@ command_handle (Environment *env)
         }
       break;
     case 5: // list_remove
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+
+          int i = 0, n = atoi(env->argv[2]);
+          struct list inner_list = temp_list_named->inner_list;
+          struct list_elem* before;
+          for (before = list_begin(&inner_list)
+               ; i < n && before != list_end (&inner_list)
+               ; i++, before = list_next(before));
+          list_remove(before);
+        }
       break;
     case 6: // list_pop_front
         {
