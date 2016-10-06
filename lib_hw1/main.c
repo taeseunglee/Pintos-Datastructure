@@ -36,6 +36,10 @@ command_handle (Environment* env);
 struct list_named*
 find_list_named(struct list_named* all_list
                 , const char* name);
+bool
+list_less (const struct list_elem* a
+                , const struct list_elem* b
+                , void* aux);
 
 int
 main ()
@@ -371,8 +375,18 @@ command_handle (Environment *env)
         }
       break;
     case 12: // list_reverse
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          list_reverse(&temp_list_named->inner_list);
+        }
       break;
     case 13: // list_sort
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          list_sort(&temp_list_named->inner_list, list_less, NULL);
+        }
       break;
     case 14: // list_insert_ordered
       break;
@@ -452,4 +466,16 @@ command_handle (Environment *env)
 
 
   return ret;
+}
+
+bool
+list_less(const struct list_elem* a
+                , const struct list_elem* b
+                , void* aux)
+{
+  int item_a = list_entry(a, struct list_item, list_sequence)->item
+   , item_b = list_entry(b, struct list_item, list_sequence)->item;
+
+  if (item_a < item_b) { return true; }
+  else                 { return false; }
 }
