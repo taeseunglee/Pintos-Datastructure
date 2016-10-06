@@ -231,7 +231,7 @@ command_handle (Environment *env)
                   struct list_item* temp_remove_item  = 
                    list_entry(temp_remove, struct list_item, list_sequence);
                   free(temp_remove_item);
-                  
+
                 }
               struct list_named* temp_remove_named = 
                temp_list_named->next;
@@ -270,8 +270,8 @@ command_handle (Environment *env)
            calloc(1, sizeof(struct list_item));
           temp_item->item = atoi(env->argv[2]);
           list_push_front(&temp_list_named->inner_list
-                         , &temp_item->list_sequence
-                        );
+                          , &temp_item->list_sequence
+                         );
         }
       break;
     case 4: // list_push_back
@@ -348,8 +348,27 @@ command_handle (Environment *env)
         }
       break;
     case 10: // list_size
+        {
+          struct list_named* temp_named =
+           find_list_named(env->all_list, env->argv[1]);
+
+          printf("%d\n", list_size(&temp_named->inner_list));
+        }
+
       break;
     case 11: // list_empty
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          if (list_empty(&temp_list_named->inner_list))
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 12: // list_reverse
       break;
