@@ -33,11 +33,19 @@ int
 get_command_num (const char* command_name);
 int
 command_handle (Environment* env);
+struct list_named*
+find_list_named(struct list_named* all_list
+                , const char* name);
 
 int
 main ()
 {
   Environment env;
+  env.all_list = calloc (1, sizeof(struct list_named));
+  env.argv = NULL;
+  env.argc = 0;
+  env.command_num = 0;
+
   while (true)
     {
       char command_line_buffer[MAX_COMMAND_BUFFER];
@@ -63,6 +71,20 @@ main ()
     }
 }
 
+struct list_named*
+find_list_named(struct list_named* all_list
+                , const char* name)
+{
+  struct list_named* temp_list_named = all_list;
+  while (temp_list_named)
+    {
+      if (!strcmp(temp_list_named->name, name)) { break; }
+      temp_list_named = temp_list_named->next;
+    }
+
+  return temp_list_named;
+}
+
 
 int
 get_command_num(const char* command_name)
@@ -72,7 +94,7 @@ get_command_num(const char* command_name)
       // Create, Dump : start : 0~
       "create", "dumpdata"
        // List . count : 18, start : 2~
-       , "list_insert", "list_splice", "list_push"
+       , "list_insert", "list_splice", "list_push_back"
        , "list_remove", "list_pop_front", "list_pop_back"
        , "list_front", "list_back"
        , "list_size", "list_empty"
@@ -94,9 +116,11 @@ get_command_num(const char* command_name)
        , "bitmap_dump", "bitmap_expand"
        // Quit , start : 46
        , "quit"
+       , "list_push_front" // TODO : list 라인에 같이 넣어서 case 처리 수정. 혹은 다른 방법으로 해결.
+       , "delete"
     };
 
-  int i = 0, cnt_command = 2 + 18 + 9 + 17 + 1;
+  int i = 0, cnt_command = 2 + 18 + 9 + 17 + 3;
 
   for (i = 0; i < cnt_command; i++)
     {
@@ -110,26 +134,28 @@ int
 command_handle (Environment *env)
 {
   int ret = 1;  // result : 1 - normal, 0 - exit, -1 - error
+  // TODO : argc에 따른 에러처리 해주면 매우 안정적인 프로그램이 될 것이다.! 겨울 방학 때의 나에게 맡긴다 후후.
   switch (env->command_num)
     {
     case 0 : // Create
         {
-          if (env->argc < 3)
+          if (env->argc != 3)
             {
               fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
               return -1;
             }
           if (!strcmp(env->argv[1], "list"))
             {
+              // TODO : list에 넣기 전에 name이 겹치는지 체크하면 더 좋을 듯!
               // create new list
               struct list_named* new_list_named = calloc(1, sizeof(struct list_named));
               strcpy(new_list_named->name, env->argv[2]);
               list_init(&new_list_named->inner_list);
 
               struct list_named* temp_list = env->all_list;
-              if (temp_list == NULL)
+              if (temp_list->next == NULL)
                 {
-                  temp_list = new_list_named;
+                  temp_list->next = new_list_named;
                 }
               else
                 {
@@ -163,44 +189,127 @@ command_handle (Environment *env)
               return -1;
             }
           // List
-          struct list_named* temp_list_named = env->all_list;
-          while (temp_list_named)
-            {
-              if (!strcmp(temp_list_named->name, env->argv[1])) { break; }
-              temp_list_named = temp_list_named->next;
-            }
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
 
           if (temp_list_named)
             {
-              struct list_elem* temp_list_elem = list_begin(&temp_list_named->inner_list);
+              struct list_elem* temp_list_elem = 
+               list_begin(&temp_list_named->inner_list);
               for (temp_list_elem = list_begin(&temp_list_named->inner_list);
                    temp_list_elem != list_end(&temp_list_named->inner_list);
                    temp_list_elem = list_next(temp_list_elem))
                 {
-                  printf("%d ", list_entry(temp_list_elem, struct list_item, list_sequence)->item);
+                  printf("%d ", list_entry(temp_list_elem
+                                           , struct list_item
+                                           , list_sequence)->item
+                        );
                 }
               printf("\n");
             }
         }
       break;
+    case 48: // delete
+        {
+          // TODO : Delete 할 때 지우기 전 있는지 체크!
+          struct list_named* temp_list_named = env->all_list;
+          while (temp_list_named->next)
+            {
+              printf("%s\n", temp_list_named->next->name);
+              if (!strcmp(temp_list_named->next->name, env->argv[1])) { break; }
+              temp_list_named = temp_list_named->next;
+            }
 
+          if (temp_list_named->next)
+            {
+              printf("%s\n", temp_list_named->next->name);
+              struct list *temp_list =
+               &temp_list_named->next->inner_list;
+              struct list_elem* temp_remove = NULL;
 
+              while (!list_empty(temp_list))
+                {
+                  temp_remove = list_pop_front(temp_list);
+                  struct list_item* temp_remove_item  = 
+                   list_entry(temp_remove, struct list_item, list_sequence);
+                  free(temp_remove_item);
+                  
+                }
+              struct list_named* temp_remove_named = 
+               temp_list_named->next;
+              temp_list_named->next = temp_list_named->next->next;
+
+              free(temp_remove_named);
+            }
+        }
+      break;
       // List
     case 2: // list_insert
       break;
     case 3: // list_splice
       break;
-    case 4: // list_push
+    case 47: // list_push_front
+      break;
+    case 4: // list_push_back
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_item* temp_item = 
+           calloc(1, sizeof(struct list_item));
+          temp_item->item = atoi(env->argv[2]);
+          list_push_back(&temp_list_named->inner_list
+                         , &temp_item->list_sequence
+                        );
+        }
       break;
     case 5: // list_remove
       break;
     case 6: // list_pop_front
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_remove = 
+           list_pop_front(&temp_list_named->inner_list);
+          struct list_item* temp_remove_item  = 
+           list_entry(temp_remove, struct list_item, list_sequence);
+          free(temp_remove_item);
+        }
       break;
     case 7: // list_pop_back
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_remove = 
+           list_pop_back(&temp_list_named->inner_list);
+          struct list_item* temp_remove_item = 
+           list_entry(temp_remove, struct list_item, list_sequence);
+          free(temp_remove_item);
+        }
       break;
     case 8: // list_front
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_item = 
+           list_front(&temp_list_named->inner_list);
+          printf("%d\n", list_entry(temp_item
+                                    , struct list_item
+                                    , list_sequence)->item
+                );
+        }
+
       break;
     case 9: // list_back
+        {
+          struct list_named* temp_list_named = 
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_item = 
+           list_back(&temp_list_named->inner_list);
+          printf("%d\n", list_entry(temp_item
+                                    , struct list_item
+                                    , list_sequence)->item
+                );
+        }
       break;
     case 10: // list_size
       break;

@@ -3,3 +3,8 @@ Score.txt
 *.o
 *.swp
 a.out
+.nfs*
+*.in
+*.out
+*.output
+*.result
