@@ -9,25 +9,25 @@
 #define MAX_NAME_LEN 20
 
 struct list_item
-  {
-    struct list_elem list_sequence;
-    int item;
-  };
+{
+  struct list_elem list_sequence;
+  int item;
+};
 
 struct list_named
-  {
-    struct list real_list;
-    struct list_named *next;
-    char name[MAX_NAME_LEN];
-  };
+{
+  struct list inner_list;
+  struct list_named *next;
+  char name[MAX_NAME_LEN];
+};
 
 typedef struct _Environment
-  {
-    struct list_named* all_list;
-    char ** argv;
-    int argc;
-    int command_num;
-  } Environment;
+{
+  struct list_named* all_list;
+  char ** argv;
+  int argc;
+  int command_num;
+} Environment;
 
 int
 get_command_num (const char* command_name);
@@ -50,7 +50,7 @@ main ()
       if (env.argv[0] != NULL)
         {
           env.command_num = get_command_num(env.argv[0]);
-         
+
           res = command_handle(&env);
         }
       else
@@ -58,7 +58,7 @@ main ()
           fprintf(stderr, "Enter argv[0]\n");
         }
       tokenizer_deallocate_argvs(&env.argv, argc);
-      
+
       if (res == -1 || res == 0) { return res; } // if res == -1 : error occurs.
     }
 }
@@ -113,41 +113,75 @@ command_handle (Environment *env)
   switch (env->command_num)
     {
     case 0 : // Create
-      if (env->argc < 3)
         {
-          fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
-          return -1;
-        }
-      if (!strcmp(env->argv[1], "list"))
-        {
-          struct list_named* new_list_named = calloc(1, sizeof(struct list_named));
-          strcpy(new_list_named->name, env->argv[2]);
-          
-          struct list_name* temp = env->all_list;
-          if (temp == NULL)
+          if (env->argc < 3)
             {
-              temp = new_list_named;
+              fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
+              return -1;
             }
-          else
+          if (!strcmp(env->argv[1], "list"))
             {
-              while ()
+              // create new list
+              struct list_named* new_list_named = calloc(1, sizeof(struct list_named));
+              strcpy(new_list_named->name, env->argv[2]);
+              list_init(&new_list_named->inner_list);
+
+              struct list_named* temp_list = env->all_list;
+              if (temp_list == NULL)
+                {
+                  temp_list = new_list_named;
+                }
+              else
+                {
+                  while (temp_list->next)
+                    {
+                      temp_list = temp_list->next;
+                    }
+                  temp_list->next = new_list_named;
+                }
             }
-        }
-      else if (!strcmp(env->argv[1], "hashtable"))
-        {
-          
-        }
-      else if (!strcmp(env->argv[1], "bitmap"))
-        {
-        
-        }
-      else // error
-        {
-          fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
-          return -1;
+          else if (!strcmp(env->argv[1], "hashtable"))
+            {
+
+            }
+          else if (!strcmp(env->argv[1], "bitmap"))
+            {
+
+            }
+          else // error
+            {
+              fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
+              return -1;
+            }
         }
       break;
     case 1 : // dumpdata
+        {
+          if (env->argc < 2)
+            {
+              fprintf(stderr, "dumpdata <list_name|hashtable_name|bitmap_name>\n");
+              return -1;
+            }
+          // List
+          struct list_named* temp_list_named = env->all_list;
+          while (temp_list_named)
+            {
+              if (!strcmp(temp_list_named->name, env->argv[1])) { break; }
+              temp_list_named = temp_list_named->next;
+            }
+
+          if (temp_list_named)
+            {
+              struct list_elem* temp_list_elem = list_begin(&temp_list_named->inner_list);
+              for (temp_list_elem = list_begin(&temp_list_named->inner_list);
+                   temp_list_elem != list_end(&temp_list_named->inner_list);
+                   temp_list_elem = list_next(temp_list_elem))
+                {
+                  printf("%d ", list_entry(temp_list_elem, struct list_item, list_sequence)->item);
+                }
+              printf("\n");
+            }
+        }
       break;
 
 
@@ -250,7 +284,7 @@ command_handle (Environment *env)
     case 46: // Quit
       ret = 0;
       break;
-  }
+    }
 
 
   return ret;
