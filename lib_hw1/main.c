@@ -4,6 +4,7 @@
 #include "./list.h"
 #include "./new_utils.h"
 #include "./tokenizer.h"
+#include "./hash.h"
 
 #define MAX_COMMAND_BUFFER 100
 #define MAX_NAME_LEN 20
@@ -21,9 +22,23 @@ struct list_named
   char name[MAX_NAME_LEN];
 };
 
+struct hash_item
+{
+  struct hash_elem hash_sequence;
+  int item;
+};
+
+struct hash_named
+{
+  struct hash inner_hash;
+  struct hash_named* next;
+  char name[MAX_NAME_LEN];
+};
+
 typedef struct _Environment
 {
   struct list_named* all_list;
+  struct hash_named* all_hash;
   char ** argv;
   int argc;
   int command_num;
@@ -36,17 +51,32 @@ command_handle (Environment* env);
 struct list_named*
 find_list_named(struct list_named* all_list
                 , const char* name);
+
+struct hash_named*
+find_hash_named(struct hash_named* all_hash
+                , const char* name);
+
 bool
 list_less (const struct list_elem* a
            , const struct list_elem* b
            , void* aux);
-// void
-// list_swap (struct list_elem *a, struct list_elem *b);
+bool
+hash_less (const struct hash_elem *a
+           , const struct hash_elem *b
+           , void *aux);
+
+unsigned
+hash_hash (const struct hash_elem* e, void *aux);
+
+void
+hash_action (struct hash_elem* e, void *aux);
+
 int
 main ()
 {
   Environment env;
   env.all_list = calloc (1, sizeof(struct list_named));
+  env.all_hash = calloc (1, sizeof(struct hash_named));
   env.argv = NULL;
   env.argc = 0;
   env.command_num = 0;
@@ -88,6 +118,20 @@ find_list_named(struct list_named* all_list
     }
 
   return temp_list_named;
+}
+
+struct hash_named*
+find_hash_named(struct hash_named* all_hash
+                , const char* name)
+{
+  struct hash_named* temp_hash_named = all_hash;
+  while (temp_hash_named)
+    {
+      if (!strcmp(temp_hash_named->name, name)) { break; }
+      temp_hash_named = temp_hash_named->next;
+    }
+
+  return temp_hash_named;
 }
 
 
@@ -153,7 +197,8 @@ command_handle (Environment *env)
             {
               // TODO : list에 넣기 전에 name이 겹치는지 체크하면 더 좋을 듯!
               // create new list
-              struct list_named* new_list_named = calloc(1, sizeof(struct list_named));
+              struct list_named* new_list_named = 
+               calloc(1, sizeof(struct list_named));
               strcpy(new_list_named->name, env->argv[2]);
               list_init(&new_list_named->inner_list);
 
@@ -173,7 +218,25 @@ command_handle (Environment *env)
             }
           else if (!strcmp(env->argv[1], "hashtable"))
             {
+              struct hash_named* new_hash_named =
+               calloc(1, sizeof(struct hash_named));
+              strcpy(new_hash_named->name, env->argv[2]);
+              hash_init(&new_hash_named->inner_hash,
+                        hash_hash, hash_less, NULL);
 
+              struct hash_named* temp_hash = env->all_hash;
+              if (temp_hash->next == NULL)
+                {
+                  temp_hash->next = new_hash_named;
+                }
+              else
+                {
+                  while (temp_hash->next)
+                    {
+                      temp_hash = temp_hash->next;
+                    }
+                  temp_hash->next = new_hash_named;
+                }
             }
           else if (!strcmp(env->argv[1], "bitmap"))
             {
@@ -199,8 +262,7 @@ command_handle (Environment *env)
 
           if (temp_list_named)
             {
-              struct list_elem* temp_list_elem = 
-               list_begin(&temp_list_named->inner_list);
+              struct list_elem* temp_list_elem;
               for (temp_list_elem = list_begin(&temp_list_named->inner_list);
                    temp_list_elem != list_end(&temp_list_named->inner_list);
                    temp_list_elem = list_next(temp_list_elem))
@@ -211,7 +273,32 @@ command_handle (Environment *env)
                         );
                 }
               printf("\n");
+              break;
             }
+
+          // Hashtable
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+
+          if (temp_hash_named)
+            {
+              struct hash* temp_hash = &temp_hash_named->inner_hash;
+              struct hash_iterator i;
+
+              hash_first (&i, temp_hash);
+              while (hash_next (&i))
+                {
+                  struct hash_item* temp_hash_item = 
+                   hash_entry (hash_cur(&i), struct hash_item
+                               , hash_sequence);
+                  
+                  printf("%d ", temp_hash_item->item);
+                }
+              printf("\n");
+              break;
+            }
+
+          // Bitmap
         }
       break;
     case 48: // delete
@@ -481,10 +568,9 @@ command_handle (Environment *env)
       break;
 
 
-
-
       // Hashtable
     case 20: // hash_insert
+      
       break;
     case 21: // hash_replace
       break;
@@ -557,5 +643,29 @@ list_less(const struct list_elem* a
 
   if (item_a < item_b) { return true; }
   else                 { return false; }
+}
+bool
+hash_less (const struct hash_elem *a
+           , const struct hash_elem *b
+           , void *aux)
+{
+  int item_a = hash_entry(a, struct hash_item, hash_sequence)->item
+   , item_b = hash_entry(b, struct hash_item, hash_sequence)->item;
+
+  if (item_a < item_b) { return true; }
+  else                 { return false; }
+}
+
+unsigned
+hash_hash (const struct hash_elem* e, void *aux)
+{
+  int item = hash_entry(e, struct hash_item, hash_sequence)->item;
+  return hash_int(item);
+}
+
+void
+hash_action (struct hash_elem* e, void *aux)
+{
+
 }
 
