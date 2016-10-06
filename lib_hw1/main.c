@@ -69,7 +69,9 @@ unsigned
 hash_hash (const struct hash_elem* e, void *aux);
 
 void
-hash_action (struct hash_elem* e, void *aux);
+hash_action_square (struct hash_elem* e, void* aux);
+void
+hash_action_triple (struct hash_elem* e, void* aux);
 
 int
 main ()
@@ -304,6 +306,7 @@ command_handle (Environment *env)
     case 48: // delete
         {
           // TODO : Delete 할 때 지우기 전 있는지 체크!
+          // List
           struct list_named* temp_list_named = env->all_list;
           while (temp_list_named->next)
             {
@@ -323,14 +326,46 @@ command_handle (Environment *env)
                   struct list_item* temp_remove_item  = 
                    list_entry(temp_remove, struct list_item, list_sequence);
                   free(temp_remove_item);
-
                 }
               struct list_named* temp_remove_named = 
                temp_list_named->next;
               temp_list_named->next = temp_list_named->next->next;
 
               free(temp_remove_named);
+              break;
             }
+
+/*
+          // Hashtable
+          struct hash_named* temp_hash_named = env->all_hash;
+          while (temp_hash_named->next)
+            {
+              if (!strcmp(temp_hash_named->next->name, env->argv[1])) { break; }
+              temp_hash_named = temp_hash_named->next;
+            }
+
+          if (temp_hash_named->next)
+            {
+              struct hash* temp_hash =
+               &temp_hash_named->next->inner_hash;
+              struct hash_elem* temp_remove = NULL;
+
+              while (!hash_empty(temp_hash))
+                {
+                  temp_remove = hash_pop_front(temp_hash);
+                  struct hash_item* temp_remove_item = 
+                   hash_entry(temp_remove, struct hash_item, hash_sequence);
+                  free(temp_remove_item);
+                }
+              struct hash_named* temp_remove_named =
+               temp_hash_named->next;
+              temp_hash_named->next = temp_hash_named->next->next;
+              
+              free(temp_remove_named);
+              break;
+            }
+*/
+          // Bitmap
         }
       break;
       // List
@@ -570,9 +605,20 @@ command_handle (Environment *env)
 
       // Hashtable
     case 20: // hash_insert
-      
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          struct hash_item* temp_item =
+           calloc(1, sizeof(struct hash_item));
+          temp_item->item = atoi(env->argv[2]);
+
+          struct hash_elem* temp_hash_elem = hash_insert(&temp_hash_named->inner_hash
+                      , &temp_item->hash_sequence);
+          if (temp_hash_elem) { free(temp_hash_elem); }
+        }
       break;
     case 21: // hash_replace
+
       break;
     case 22: // hash_find
       break;
@@ -585,6 +631,21 @@ command_handle (Environment *env)
     case 26: // hash_empty
       break;
     case 27: // hash_apply
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          
+          if (!strcmp(env->argv[2], "square"))
+            {
+              hash_apply(&temp_hash_named->inner_hash
+                         , hash_action_square);
+            }
+          else if (!strcmp(env->argv[2], "triple"))
+            {
+              hash_apply(&temp_hash_named->inner_hash
+                         , hash_action_triple);
+            }
+        }
       break;
     case 28: // hash_int_2
       break;
@@ -664,8 +725,19 @@ hash_hash (const struct hash_elem* e, void *aux)
 }
 
 void
-hash_action (struct hash_elem* e, void *aux)
+hash_action_square (struct hash_elem* e, void* aux)
 {
-
+  struct hash_item* temp_hash_item =
+   hash_entry(e, struct hash_item, hash_sequence);
+  int item = temp_hash_item->item;
+  temp_hash_item->item = item*item;
 }
 
+void
+hash_action_triple (struct hash_elem* e, void* aux)
+{
+  struct hash_item* temp_hash_item =
+   hash_entry(e, struct hash_item, hash_sequence);
+  int item = temp_hash_item->item;
+  temp_hash_item->item = item*item*item;
+}
