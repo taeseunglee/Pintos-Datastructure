@@ -70,8 +70,12 @@ hash_hash (const struct hash_elem* e, void *aux);
 
 void
 hash_action_square (struct hash_elem* e, void* aux);
+
 void
 hash_action_triple (struct hash_elem* e, void* aux);
+
+void
+hash_action_destructor (struct hash_elem* e, void* aux);
 
 int
 main ()
@@ -95,7 +99,6 @@ main ()
       if (env.argv[0] != NULL)
         {
           env.command_num = get_command_num(env.argv[0]);
-
           res = command_handle(&env);
         }
       else
@@ -612,21 +615,81 @@ command_handle (Environment *env)
            calloc(1, sizeof(struct hash_item));
           temp_item->item = atoi(env->argv[2]);
 
-          struct hash_elem* temp_hash_elem = hash_insert(&temp_hash_named->inner_hash
+          struct hash_elem* temp_hash_elem = 
+           hash_insert(&temp_hash_named->inner_hash
                       , &temp_item->hash_sequence);
-          if (temp_hash_elem) { free(temp_hash_elem); }
+          if (temp_hash_elem) { free(temp_item); }
         }
       break;
     case 21: // hash_replace
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          struct hash_item* temp_item =
+           calloc(1, sizeof(struct hash_item));
+          temp_item->item = atoi(env->argv[2]);
 
+          struct hash_elem* temp_hash_elem = 
+           hash_replace(&temp_hash_named->inner_hash
+                        , &temp_item->hash_sequence);
+          if (temp_hash_elem) { free(temp_hash_elem); }
+
+        }
       break;
     case 22: // hash_find
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          struct hash_item* temp_item =
+           calloc (1, sizeof(struct hash_item));
+          temp_item->item = atoi(env->argv[2]);
+
+          struct hash_elem* temp_hash_elem =
+           hash_find (&temp_hash_named->inner_hash
+                      , &temp_item->hash_sequence);
+          
+          if (temp_hash_elem)
+            {
+              printf("%d\n", 
+                     hash_entry(temp_hash_elem
+                                , struct hash_item
+                                , hash_sequence
+                                )->item
+                                );
+            }
+          free(temp_item);
+        }
       break;
     case 23: // hash_delete
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          struct hash_item temp_item;
+          temp_item.item = atoi(env->argv[2]);
+
+          struct hash_elem* temp_hash_elem =
+           hash_delete(&temp_hash_named->inner_hash
+                       , &temp_item.hash_sequence);
+          if (temp_hash_elem)
+            {
+              free(temp_hash_elem);
+            }
+        }
       break;
     case 24: // hash_clear
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          hash_clear(&temp_hash_named->inner_hash
+                     , hash_action_destructor);
+        }
       break;
     case 25: // hash_size
+        {
+          struct hash_named* temp_hash_named =
+           find_hash_named(env->all_hash, env->argv[1]);
+          printf("%d\n", hash_size(&temp_hash_named->inner_hash));
+        }
       break;
     case 26: // hash_empty
       break;
@@ -740,4 +803,10 @@ hash_action_triple (struct hash_elem* e, void* aux)
    hash_entry(e, struct hash_item, hash_sequence);
   int item = temp_hash_item->item;
   temp_hash_item->item = item*item*item;
+}
+
+void
+hash_action_destructor (struct hash_elem* e, void* aux)
+{
+  free(e);
 }
