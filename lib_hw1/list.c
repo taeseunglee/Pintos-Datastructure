@@ -1,5 +1,6 @@
 #include "list.h"
 #include <assert.h>	// Instead of	#include "../debug.h"
+#include <stdlib.h>
 #define ASSERT(CONDITION) assert(CONDITION)	// patched for proj0-2
 
 /* Our doubly linked lists have two header elements: the "head"
@@ -330,6 +331,18 @@ swap (struct list_elem **a, struct list_elem **b)
   *b = t;
 }
 
+void
+list_swap (struct list_elem *a, struct list_elem *b)
+{
+  a->prev->next = b;
+  a->next->prev = b;
+
+  b->prev->next = a;
+  b->next->prev = a;
+  swap (&a->next, &b->next);
+  swap (&a->prev, &b->prev);
+}
+
 /* Reverses the order of LIST. */
 void
 list_reverse (struct list *list)
@@ -447,6 +460,36 @@ list_sort (struct list *list, list_less_func *less, void *aux)
 
   ASSERT (is_sorted (list_begin (list), list_end (list), less, aux));
 }
+
+
+struct list_elem* get_nth_elem (struct list inner_list, int n)
+{
+  int i = 0;
+  struct list_elem* before;
+
+  for (i = 0, before = list_begin(&inner_list)
+       ; i < n && before != list_end (&inner_list)
+       ; ++i, before = list_next(before));
+
+  return before;
+}
+
+void
+list_shuffle (struct list *list)
+{
+  size_t n = list_size(list);
+  size_t i;
+  for (i = 0; i < n - 1; ++i) 
+    {
+      size_t j = i + rand() % (n - i);
+      struct list_elem* elem_ith =
+       get_nth_elem(*list, i);
+      struct list_elem* elem_jth =
+       get_nth_elem(*list, j);
+      list_swap(elem_ith, elem_jth);
+    }
+}
+
 
 /* Inserts ELEM in the proper position in LIST, which must be
    sorted according to LESS given auxiliary data AUX.

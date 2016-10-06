@@ -38,9 +38,10 @@ find_list_named(struct list_named* all_list
                 , const char* name);
 bool
 list_less (const struct list_elem* a
-                , const struct list_elem* b
-                , void* aux);
-
+           , const struct list_elem* b
+           , void* aux);
+// void
+// list_swap (struct list_elem *a, struct list_elem *b);
 int
 main ()
 {
@@ -265,6 +266,20 @@ command_handle (Environment *env)
         }
       break;
     case 3: // list_splice
+        {
+          struct list_named* temp_list_named1 =
+           find_list_named(env->all_list, env->argv[1])
+           , * temp_list_named2 =
+           find_list_named(env->all_list, env->argv[3]);
+          struct list inner_list1 = temp_list_named1->inner_list
+           , inner_list2 = temp_list_named2->inner_list;
+          struct list_elem* before = NULL, *first = NULL, *last = NULL;
+          before = get_nth_elem(inner_list1, atoi(env->argv[2]));
+          first = get_nth_elem(inner_list2, atoi(env->argv[4]));
+          last = get_nth_elem(inner_list2, atoi(env->argv[5]));
+
+          list_splice(before, first, last);
+        }
       break;
     case 47: // list_push_front
         {
@@ -392,7 +407,7 @@ command_handle (Environment *env)
         {
           struct list_named* temp_list_named =
            find_list_named(env->all_list, env->argv[1]);
-          
+
           struct list_item* temp_item = 
            calloc(1, sizeof(struct list_item));
           temp_item->item = atoi(env->argv[2]);
@@ -400,18 +415,69 @@ command_handle (Environment *env)
           list_insert_ordered(&temp_list_named->inner_list
                               , &temp_item->list_sequence
                               , list_less, NULL
-                              );
+                             );
         }
       break;
     case 15: // list unique
+        {
+          struct list_named* temp_list_named1 =
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_named* temp_list_named2 = NULL;
+          struct list* temp_list2 = NULL;
+          if (env->argc == 3)
+            {
+                temp_list_named2 = 
+                 find_list_named(env->all_list, env->argv[2]);
+                temp_list2 =
+                 &temp_list_named2->inner_list;
+            }
+          list_unique(&temp_list_named1->inner_list
+                      , temp_list2, list_less
+                      , NULL);
+        }
       break;
     case 16: // list_max
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_elem = 
+            list_max(&temp_list_named->inner_list, list_less, NULL);
+          struct list_item* temp_item = 
+           list_entry(temp_elem, struct list_item, list_sequence);
+
+          printf("%d\n", temp_item->item);
+        }
       break;
     case 17: // list_min
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* temp_elem = 
+            list_min(&temp_list_named->inner_list, list_less, NULL);
+          struct list_item* temp_item = 
+           list_entry(temp_elem, struct list_item, list_sequence);
+
+          printf("%d\n", temp_item->item);
+        }
       break;
     case 18: // list_swap
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          struct list_elem* first_elem = 
+           get_nth_elem(temp_list_named->inner_list, atoi(env->argv[2]));
+          struct list_elem* second_elem =
+           get_nth_elem(temp_list_named->inner_list, atoi(env->argv[3]));
+
+          list_swap(first_elem, second_elem);
+        }
       break;
-    case 19: // list_shuffle
+    case 19: // list_shuffle <usage> : list_shuffle <list_name>
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          list_shuffle(&temp_list_named->inner_list);
+        }
       break;
 
 
@@ -483,8 +549,8 @@ command_handle (Environment *env)
 
 bool
 list_less(const struct list_elem* a
-                , const struct list_elem* b
-                , void* aux)
+          , const struct list_elem* b
+          , void* aux)
 {
   int item_a = list_entry(a, struct list_item, list_sequence)->item
    , item_b = list_entry(b, struct list_item, list_sequence)->item;
@@ -492,3 +558,4 @@ list_less(const struct list_elem* a
   if (item_a < item_b) { return true; }
   else                 { return false; }
 }
+
