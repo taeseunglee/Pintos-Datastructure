@@ -389,6 +389,19 @@ command_handle (Environment *env)
         }
       break;
     case 14: // list_insert_ordered
+        {
+          struct list_named* temp_list_named =
+           find_list_named(env->all_list, env->argv[1]);
+          
+          struct list_item* temp_item = 
+           calloc(1, sizeof(struct list_item));
+          temp_item->item = atoi(env->argv[2]);
+
+          list_insert_ordered(&temp_list_named->inner_list
+                              , &temp_item->list_sequence
+                              , list_less, NULL
+                              );
+        }
       break;
     case 15: // list unique
       break;
