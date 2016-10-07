@@ -5,6 +5,7 @@
 #include "./new_utils.h"
 #include "./tokenizer.h"
 #include "./hash.h"
+#include "./bitmap.h"
 
 #define MAX_COMMAND_BUFFER 100
 #define MAX_NAME_LEN 20
@@ -35,10 +36,18 @@ struct hash_named
   char name[MAX_NAME_LEN];
 };
 
+struct bitmap_named
+{
+  struct bitmap* inner_bitmap;
+  struct bitmap_named* next;
+  char name[MAX_NAME_LEN];
+};
+
 typedef struct _Environment
 {
   struct list_named* all_list;
   struct hash_named* all_hash;
+  struct bitmap_named* all_bitmap;
   char ** argv;
   int argc;
   int command_num;
@@ -77,12 +86,20 @@ hash_action_triple (struct hash_elem* e, void* aux);
 void
 hash_action_destructor (struct hash_elem* e, void* aux);
 
+struct bitmap_named*
+find_bitmap_named(struct bitmap_named* all_bitmap
+                  , const char* name);
+
+struct bitmap *
+bitmap_expand(struct bitmap *bitmap, int size);
+
 int
 main ()
 {
   Environment env;
   env.all_list = calloc (1, sizeof(struct list_named));
   env.all_hash = calloc (1, sizeof(struct hash_named));
+  env.all_bitmap = calloc (1, sizeof(struct bitmap_named));
   env.argv = NULL;
   env.argc = 0;
   env.command_num = 0;
@@ -109,6 +126,22 @@ main ()
 
       if (res == -1 || res == 0) { return res; } // if res == -1 : error occurs.
     }
+}
+
+struct bitmap *
+bitmap_expand(struct bitmap *bitmap, int size)
+{
+  int i = 0, n = bitmap_size(bitmap);
+  int new_size = n + size;
+  struct bitmap* new_bitmap = bitmap_create(new_size);
+
+  for (i = 0; i < n; ++i)
+    {
+      bitmap_set(new_bitmap, i, bitmap_test(bitmap, i));
+    }
+  free(bitmap);
+
+  return new_bitmap;
 }
 
 struct list_named*
@@ -193,11 +226,6 @@ command_handle (Environment *env)
     {
     case 0 : // Create
         {
-          if (env->argc != 3)
-            {
-              fprintf(stderr, "create <list|hashtable|bitmap> <list_name>\n");
-              return -1;
-            }
           if (!strcmp(env->argv[1], "list"))
             {
               // TODO : list에 넣기 전에 name이 겹치는지 체크하면 더 좋을 듯!
@@ -245,7 +273,26 @@ command_handle (Environment *env)
             }
           else if (!strcmp(env->argv[1], "bitmap"))
             {
+              struct bitmap_named* new_bitmap_named =
+               calloc(1, sizeof(struct bitmap_named));
+              strcpy(new_bitmap_named->name, env->argv[2]);
+              new_bitmap_named->inner_bitmap = 
+               bitmap_create(atoi(env->argv[3]));
 
+              struct bitmap_named* temp_bitmap = 
+               env->all_bitmap;
+              if (temp_bitmap->next == NULL)
+                {
+                  temp_bitmap->next = new_bitmap_named;
+                }
+              else
+                {
+                  while (temp_bitmap->next)
+                    {
+                      temp_bitmap = temp_bitmap->next;
+                    }
+                  temp_bitmap->next = new_bitmap_named;
+                }
             }
           else // error
             {
@@ -296,7 +343,7 @@ command_handle (Environment *env)
                   struct hash_item* temp_hash_item = 
                    hash_entry (hash_cur(&i), struct hash_item
                                , hash_sequence);
-                  
+
                   printf("%d ", temp_hash_item->item);
                 }
               printf("\n");
@@ -304,6 +351,18 @@ command_handle (Environment *env)
             }
 
           // Bitmap
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          if (temp_bitmap_named)
+            {
+              int i = 0;
+              struct bitmap* temp_bitmap = temp_bitmap_named->inner_bitmap;
+              for (i = 0; i < bitmap_size(temp_bitmap); ++i)
+                {
+                  printf("%d", bitmap_test(temp_bitmap, i));
+                }
+            }
+          printf("\n");
         }
       break;
     case 48: // delete
@@ -357,11 +416,34 @@ command_handle (Environment *env)
               struct hash_named* temp_remove_named =
                temp_hash_named->next;
               temp_hash_named->next = temp_hash_named->next->next;
-              
+
               free(temp_remove_named);
               break;
             }
           // Bitmap
+          struct bitmap_named* temp_bitmap_named = env->all_bitmap;
+          while (temp_bitmap_named->next)
+            {
+              if (!strcmp(temp_bitmap_named->next->name, env->argv[1])) { break; }
+              temp_bitmap_named = temp_bitmap_named->next;
+            }
+
+          if (temp_bitmap_named->next)
+            {
+              struct bitmap* temp_bitmap =
+                temp_bitmap_named->next->inner_bitmap;
+              struct bitmap_elem* temp_remove = NULL;
+
+              bitmap_destroy(temp_bitmap);
+
+              struct bitmap_named* temp_remove_named =
+               temp_bitmap_named->next;
+              temp_bitmap_named->next = temp_bitmap_named->next->next;
+
+              free(temp_remove_named);
+              break;
+            }
+
         }
       break;
       // List
@@ -544,10 +626,10 @@ command_handle (Environment *env)
           struct list* temp_list2 = NULL;
           if (env->argc == 3)
             {
-                temp_list_named2 = 
-                 find_list_named(env->all_list, env->argv[2]);
-                temp_list2 =
-                 &temp_list_named2->inner_list;
+              temp_list_named2 = 
+               find_list_named(env->all_list, env->argv[2]);
+              temp_list2 =
+               &temp_list_named2->inner_list;
             }
           list_unique(&temp_list_named1->inner_list
                       , temp_list2, list_less
@@ -559,7 +641,7 @@ command_handle (Environment *env)
           struct list_named* temp_list_named =
            find_list_named(env->all_list, env->argv[1]);
           struct list_elem* temp_elem = 
-            list_max(&temp_list_named->inner_list, list_less, NULL);
+           list_max(&temp_list_named->inner_list, list_less, NULL);
           struct list_item* temp_item = 
            list_entry(temp_elem, struct list_item, list_sequence);
 
@@ -571,7 +653,7 @@ command_handle (Environment *env)
           struct list_named* temp_list_named =
            find_list_named(env->all_list, env->argv[1]);
           struct list_elem* temp_elem = 
-            list_min(&temp_list_named->inner_list, list_less, NULL);
+           list_min(&temp_list_named->inner_list, list_less, NULL);
           struct list_item* temp_item = 
            list_entry(temp_elem, struct list_item, list_sequence);
 
@@ -610,7 +692,7 @@ command_handle (Environment *env)
 
           struct hash_elem* temp_hash_elem = 
            hash_insert(&temp_hash_named->inner_hash
-                      , &temp_item->hash_sequence);
+                       , &temp_item->hash_sequence);
           if (temp_hash_elem) { free(temp_item); }
         }
       break;
@@ -640,15 +722,15 @@ command_handle (Environment *env)
           struct hash_elem* temp_hash_elem =
            hash_find (&temp_hash_named->inner_hash
                       , &temp_item->hash_sequence);
-          
+
           if (temp_hash_elem)
             {
               printf("%d\n", 
                      hash_entry(temp_hash_elem
                                 , struct hash_item
                                 , hash_sequence
-                                )->item
-                                );
+                               )->item
+                    );
             }
           free(temp_item);
         }
@@ -702,7 +784,7 @@ command_handle (Environment *env)
         {
           struct hash_named* temp_hash_named =
            find_hash_named(env->all_hash, env->argv[1]);
-          
+
           if (!strcmp(env->argv[2], "square"))
             {
               hash_apply(&temp_hash_named->inner_hash
@@ -720,38 +802,256 @@ command_handle (Environment *env)
 
       // Bitmap
     case 29: // bitmap_size
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+
+          printf("%d\n", 
+                 bitmap_size(temp_bitmap_named->inner_bitmap));
+        }
       break;
     case 30: // bitmap_set
+        {
+          bool boolean = false;
+          if (!strcmp(env->argv[3], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[3], "false"))
+            {
+              boolean = false;
+            }
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bitmap_set(temp_bitmap_named->inner_bitmap
+                     , atoi(env->argv[2])
+                     , boolean);
+        }
       break;
     case 31: // bitmap_mark
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bitmap_mark(temp_bitmap_named->inner_bitmap
+                      , atoi(env->argv[2]));
+        }
       break;
     case 32: // bitmap_reset
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bitmap_reset(temp_bitmap_named->inner_bitmap
+                       , atoi(env->argv[2]));
+        }
       break;
     case 33: // bitmap_flip
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bitmap_flip(temp_bitmap_named->inner_bitmap
+                      , atoi(env->argv[2]));
+        }
       break;
     case 34: // bitmap_test
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool flag = 
+           bitmap_test(temp_bitmap_named->inner_bitmap
+                       , atoi(env->argv[2]));
+          if (flag)
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 35: // bitmap_set_all
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[2], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[2], "false"))
+            {
+              boolean = false;
+            }
+          bitmap_set_all(temp_bitmap_named->inner_bitmap
+                         , boolean);
+        }
       break;
     case 36: // bitmap_set_multiple
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[4], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[4], "false"))
+            {
+              boolean = false;
+            }
+          bitmap_set_multiple(temp_bitmap_named->inner_bitmap
+                              , atoi(env->argv[2]), atoi(env->argv[3]), 
+                              boolean);
+        }
       break;
     case 37: // bitmap_count
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[4], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[4], "false"))
+            {
+              boolean = false;
+            }
+          int cnt = bitmap_count(temp_bitmap_named->inner_bitmap
+                                 , atoi(env->argv[2]), atoi(env->argv[3]), boolean);
+          printf("%d\n", cnt);
+        }
       break;
     case 38: // bitmap_contains
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[4], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[4], "false"))
+            {
+              boolean = false;
+            }
+          bool flag = bitmap_contains(temp_bitmap_named->inner_bitmap
+                                      , atoi(env->argv[2]), atoi(env->argv[3]), boolean);
+          if (flag)
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 39: // bitmap_any
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool flag = bitmap_any(temp_bitmap_named->inner_bitmap
+                                 , atoi(env->argv[2]), atoi(env->argv[3]));
+          if (flag)
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 40: // bitmap_none
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool flag = bitmap_none(temp_bitmap_named->inner_bitmap
+                                  , atoi(env->argv[2]), atoi(env->argv[3]));
+          if (flag)
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 41: // bitmap_all
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool flag = bitmap_all(temp_bitmap_named->inner_bitmap
+                                 , atoi(env->argv[2]), atoi(env->argv[3]));
+          if (flag)
+            {
+              printf("true\n");
+            }
+          else
+            {
+              printf("false\n");
+            }
+        }
       break;
     case 42: // bitmap_scan
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[4], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[4], "false"))
+            {
+              boolean = false;
+            }
+
+          size_t size = bitmap_scan(temp_bitmap_named->inner_bitmap
+                                    , atoi(env->argv[2]), atoi(env->argv[3]), boolean);
+
+          printf("%u\n", size);
+        }
       break;
     case 43: // bitmap_scan_and_flip
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          bool boolean = false;
+          if (!strcmp(env->argv[4], "true"))
+            {
+              boolean = true;
+            }
+          else if (!strcmp(env->argv[4], "false"))
+            {
+              boolean = false;
+            }
+
+          size_t size = bitmap_scan_and_flip(temp_bitmap_named->inner_bitmap
+                                             , atoi(env->argv[2]), atoi(env->argv[3]), boolean);
+
+          printf("%u\n", size);
+        }
+
       break;
     case 44: // bitmap_dump
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+
+          bitmap_dump(temp_bitmap_named->inner_bitmap);
+        }
       break;
     case 45: // bitmap_expand
+        {
+          struct bitmap_named* temp_bitmap_named =
+           find_bitmap_named(env->all_bitmap, env->argv[1]);
+          temp_bitmap_named->inner_bitmap = 
+           bitmap_expand(temp_bitmap_named->inner_bitmap
+                        , atoi(env->argv[2]));
+        }
       break;
     case 46: // Quit
       ret = 0;
@@ -814,4 +1114,18 @@ void
 hash_action_destructor (struct hash_elem* e, void* aux)
 {
   free(e);
+}
+
+struct bitmap_named*
+find_bitmap_named(struct bitmap_named* all_bitmap
+                  , const char* name)
+{
+  struct bitmap_named* temp_bitmap_named = all_bitmap;
+  while (temp_bitmap_named)
+    {
+      if (!strcmp(temp_bitmap_named->name, name)) { break; }
+      temp_bitmap_named = temp_bitmap_named->next;
+    }
+
+  return temp_bitmap_named;
 }
