@@ -1040,7 +1040,7 @@ command_handle (Environment *env)
         {
           struct bitmap_named* temp_bitmap_named =
            find_bitmap_named(env->all_bitmap, env->argv[1]);
-
+          
           bitmap_dump(temp_bitmap_named->inner_bitmap);
         }
       break;

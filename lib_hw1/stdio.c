@@ -1,4 +1,6 @@
-#include <stdio.h> 
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* Dumps the SIZE bytes in BUF to the console as hex bytes
    arranged 16 per line.  Numeric offsets are also included,
@@ -30,6 +32,7 @@ hex_dump (uintptr_t ofs, const void *buf__, size_t size, bool ascii)
       for (; i < end; i++) 
         printf ("%02hhx%c",
                 buf[i - start], i == per_line / 2 - 1? '-' : ' ');
+
       if (ascii) 
         {
           for (; i < per_line; i++)

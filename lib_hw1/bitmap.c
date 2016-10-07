@@ -85,7 +85,7 @@ bitmap_create (size_t bit_cnt)
   if (b != NULL)
     {
       b->bit_cnt = bit_cnt;
-      b->bits = malloc (byte_cnt (bit_cnt));
+      b->bits = calloc (1, byte_cnt (bit_cnt));
       if (b->bits != NULL || bit_cnt == 0)
         {
           bitmap_set_all (b, false);
